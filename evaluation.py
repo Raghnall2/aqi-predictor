@@ -4,7 +4,7 @@ import os
 import json
 
 # Create Json File For Metrices
-metries= os.path.join(r"D:\projectroot","model","metrices.json")
+metries= os.path.join("model","metrices.json")
 
 # Load The Dataset
 df=load_data(r"data/processed/processed_data1.csv")
