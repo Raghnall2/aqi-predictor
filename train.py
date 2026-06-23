@@ -3,7 +3,7 @@ from ml import train_model,save_model
 
 
 # Load the dataset
-df1=load_data(r"data\raw\AirQualityData.csv")
+df1=load_data("data/raw/AirQualityData.csv")
 
 x=['pollutant_min',
     'pollutant_max',
