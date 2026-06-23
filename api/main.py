@@ -6,7 +6,6 @@ from ml import inferance_model1
 from ml import train_model
 import os
 import pickle
-
 app = FastAPI()
 scaler1= os.path.join(r"model/scaler.pkl")
 with open(scaler1, "rb") as file:

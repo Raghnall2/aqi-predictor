@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
         - name: aqi-predictor
-          image: aqi-predictor:latest
-          imagePullPolicy: Never
+          image: raghnall25/aqi-predictor:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           resources:

@@ -1,0 +1,176 @@
+Phase 1 — Train & Save Model
+bash# install dependencies
+pip install -r requirements.txt
+
+# train model → saves model/model.pkl, model/encoder.pkl, model/lb.pkl
+python train.py
+
+Phase 2 — Test Locally
+bash# run all unit tests
+pytest tests/ -v
+
+# run FastAPI locally to verify endpoints work
+uvicorn api.main:app --reload
+
+# test in another terminal
+curl -X GET http://localhost:8000/
+
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "age": 37,
+    "workclass": "Private",
+    "fnlgt": 178356,
+    "education": "HS-grad",
+    "education-num": 10,
+    "marital-status": "Married-civ-spouse",
+    "occupation": "Prof-specialty",
+    "relationship": "Husband",
+    "race": "White",
+    "sex": "Male",
+    "capital-gain": 0,
+    "capital-loss": 0,
+    "hours-per-week": 40,
+    "native-country": "United-States"
+  }'
+
+Phase 3 — Docker
+bash# build the image
+docker build -t aqi-predictor:latest .
+
+# test the container locally before pushing
+docker run -p 8000:8000 aqi-predictor:latest
+
+# verify it works
+curl http://localhost:8000/
+
+# tag for Docker Hub (replace <username>)
+docker tag aqi-predictor:latest <username>/aqi-predictor:latest
+
+# push to Docker Hub
+docker push <username>/aqi-predictor:latest
+
+Phase 4 — Kubernetes Cluster Setup
+bash# start minikube (if local)
+minikube start
+
+# verify cluster is running
+kubectl cluster-info
+
+# verify nodes are ready
+kubectl get nodes
+
+Phase 5 — Deploy to Kubernetes
+bash# apply Deployment (creates aqi-predictor pods)
+kubectl apply -f k8s/deployment.yaml
+
+# apply Service (exposes aqi-predictor internally)
+kubectl apply -f k8s/service.yaml
+
+# apply HPA (autoscaler — 2 to 5 replicas at 70% CPU)
+kubectl apply -f k8s/hpa.yaml
+
+# verify all 3 are created
+kubectl get deployment aqi-predictor
+kubectl get service aqi-service
+kubectl get hpa aqi-predictor-hpa
+
+Phase 6 — Install Metrics Server
+bash# install metrics server (required for HPA to read CPU)
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+# if on Minikube/kubeadm — patch for TLS (run if metrics-server pod crashes)
+kubectl patch deployment metrics-server -n kube-system \
+  --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
+# wait for metrics-server to be ready (watch until 1/1)
+kubectl get deployment metrics-server -n kube-system -w
+
+# verify metrics are flowing
+kubectl top nodes
+kubectl top pods
+
+Phase 7 — Verify Everything
+bash# check all pods are Running
+kubectl get pods
+
+# check HPA is reading CPU (should show e.g. 4%/70% not <unknown>)
+kubectl get hpa aqi-predictor-hpa
+
+# check service endpoint
+kubectl get service aqi-service
+
+# describe deployment for full details
+kubectl describe deployment aqi-predictor
+
+# check pod logs
+kubectl logs -l app=aqi-predictor
+
+Phase 8 — Load Test & Watch Autoscaling
+bash# terminal 1 — launch load generator
+kubectl run load-generator \
+  --image=busybox \
+  --restart=Never \
+  -- /bin/sh -c "while true; do wget -q -O- http://aqi-service/predict; done"
+
+# terminal 2 — watch HPA react and scale up
+kubectl get hpa aqi-predictor-hpa -w
+
+# terminal 3 — watch pods being created
+kubectl get pods -w
+
+# stop the load generator (Ctrl+C just exits watch, pod keeps running)
+# so explicitly delete it
+kubectl delete pod load-generator
+
+# watch HPA scale back down (takes ~5 min cooldown)
+kubectl get hpa aqi-predictor-hpa -w
+
+Phase 9 — Debug Commands (use if anything breaks)
+bash# pod not starting?
+kubectl describe pod <pod-name>
+
+# app crashing?
+kubectl logs <pod-name>
+kubectl logs <pod-name> --previous   # logs from crashed container
+
+# HPA still showing <unknown>?
+kubectl describe hpa aqi-predictor-hpa   # shows exact error in Events
+
+# metrics-server pod crashing?
+kubectl logs -n kube-system deployment/metrics-server
+
+# service not reachable?
+kubectl describe service aqi-service
+kubectl get endpoints aqi-service     # should show pod IPs, not <none>
+
+# check all resources at once
+kubectl get all
+
+Phase 10 — Cleanup
+bash# delete HPA first (so it doesn't fight with manual scaling)
+kubectl delete hpa aqi-predictor-hpa
+
+# delete service and deployment
+kubectl delete -f k8s/service.yaml
+kubectl delete -f k8s/deployment.yaml
+
+# or delete everything at once
+kubectl delete -f k8s/
+
+# stop minikube (if local)
+minikube stop
+
+# delete minikube cluster entirely
+minikube delete
+
+Full Order Summary
+pip install → python train.py → pytest → uvicorn (local test)
+    → docker build → docker push
+    → minikube start → kubectl apply (deployment, service, hpa)
+    → kubectl apply metrics-server → kubectl top pods (verify)
+    → kubectl get hpa (verify CPU% shows)
+    → kubectl run load-generator → watch hpa/pods scale
+    → kubectl delete load-generator → watch scale down
+    → kubectl delete all → minikube stop
