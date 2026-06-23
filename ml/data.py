@@ -36,6 +36,8 @@ def process_data(df: pd.DataFrame, x: Optional[List[str]] = None, cat: Optional[
             df[i] = df[i].round(2)
 
     # 5. Save the outputs using forward slashes (works on both Windows and Linux)
+    import os
+    os.makedirs("data/processed", exist_ok=True)
     df.to_csv("data/processed/processed_data1.csv", index=False)
     return df, encoders
     

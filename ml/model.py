@@ -27,6 +27,8 @@ def train_model(df: pd.DataFrame, target: str):
     # Scale
     scaler  = StandardScaler()
     X_train = scaler.fit_transform(X_train)
+    import os
+    os.makedirs("model", exist_ok=True)
     with open("model/scaler.pkl", "wb") as file:
         pickle.dump(scaler, file)
     X_test  = scaler.transform(X_test)
